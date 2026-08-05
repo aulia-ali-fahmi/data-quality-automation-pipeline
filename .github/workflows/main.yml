@@ -1,0 +1,32 @@
+name: Data Quality Pipeline Runner
+
+# Menentukan kapan otomatisasi ini berjalan di server GitHub
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest  # Menggunakan server Linux gratisan milik GitHub
+
+    steps:
+    # Langkah 1: Mengambil seluruh file dari repositori GitHub Anda
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # Langkah 2: Menyiapkan environment Python versi 3.10
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    # Langkah 3: Memasang semua pustaka yang tercatat di requirements.txt
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # Langkah 4: Mengeksekusi pipeline utama DuckDB secara otomatis
+    - name: Run Pipeline
+      run: |
+        python pipeline.py
