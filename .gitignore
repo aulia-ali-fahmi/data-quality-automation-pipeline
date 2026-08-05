@@ -1,2 +1,28 @@
 env/ 
 kalaulupa.txt
+
+# ==========================================
+# 1. ABAIKAN FILE OUTPUT & LOG (HASIL RUNNING PIPELINE)
+# ==========================================
+*.log
+*.duckdb
+*.parquet
+laporan_kotor_uk.csv
+
+# ==========================================
+# 2. ABAIKAN FOLDER OUTPUT / HASIL DIPINDAHKAN PIPELINE
+# ==========================================
+archive/*
+rejected/*
+data_mart/*
+
+# Tetap pertahankan folder kosongnya di Git
+!archive/.gitkeep
+!rejected/.gitkeep
+!data_mart/.gitkeep
+
+# ==========================================
+# 3. ABAIKAN CACHE PYTHON
+# ==========================================
+__pycache__/
+*.pyc
