@@ -27,9 +27,3 @@ data_mart/*
 # ==========================================
 __pycache__/
 *.pyc
-
-# 4. KECUALIKAN DATA INPUT
-# Abaikan semua CSV secara umum, TETAPI izinkan isi folder input/
-*.csv
-!input/
-!input/*.csv
