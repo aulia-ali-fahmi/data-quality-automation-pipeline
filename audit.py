@@ -1,53 +1,67 @@
 import duckdb
 import sys
 
-# Tangkap nama file dari pipeline
-nama_file = sys.argv[1] if len(sys.argv) > 1 else 'DEBUG'
+# =====================================================================
+# 1. TANGKAP ARGUMEN DINAMIS DARI PIPELINE
+# Tangkap nama file target dari argument pipeline.py
+# =====================================================================
+target_file_name = sys.argv[1] if len(sys.argv) > 1 else 'DEBUG'
 
-print("Memuat dataset E-Commerce UK...")
-con = duckdb.connect('latihan_QA.db')
+print("=== STARTING DATA AUDIT & ANOMALY DETECTION ===")
 
-# 1. Query kotor dengan 5 kolom dasar + 1 kolom penanda asal file
-query_kotor = f"""
+# Hubungkan ke database staging sementara
+db_conn = duckdb.connect('temp_staging.db')
+
+# =====================================================================
+# 2. SELEKSI DATA KOTOR (ANOMALIES)
+# Filter record yang melanggar integritas data (Null Customer / Non-positive Price & Qty)
+# Read dari tabel 'raw_sales' hasil keluaran standardizer.py
+# =====================================================================
+dirty_data_query = f"""
 	SELECT 
 		InvoiceNo, 
 		StockCode, 
 		Quantity, 
 		UnitPrice, 
 		CustomerID, 
-		'{nama_file}' AS nama_file_asal
-	FROM ritel
+		'{target_file_name}' AS source_file_name
+	FROM raw_sales
 	WHERE CustomerID IS NULL
 	OR UnitPrice <= 0
 	OR Quantity < 0
 """
 
-print("\n--- MENGHITUNG TOTAL DATA ---")
-print(con.execute("SELECT COUNT(*) AS total_semua_data FROM ritel").df())
+print("\n--- CALCULATING TOTAL RECORDS ---")
+print(db_conn.execute("SELECT COUNT(*) AS total_records FROM raw_sales").df())
 
-print("\n--- MENGHITUNG DATA KOTOR ---")
-print(con.execute(f"SELECT COUNT(*) AS total_kotor FROM ({query_kotor})").df())
+print("\n--- CALCULATING DIRTY/INVALID RECORDS ---")
+print(db_conn.execute(f"SELECT COUNT(*) AS dirty_records_count FROM ({dirty_data_query})").df())
 
-print("\n--- MENYIMPAN DATA KOTOR KE CSV UNTUK DI-AUDIT TIM BISNIS ---")
+# =====================================================================
+# 3. PENYIMPANAN DATA KOTOR KE MASTER TABLE
+# Menggabungkan/append data kotor baru ke tabel penampungan laporan
+# =====================================================================
+print("\n--- SAVING DIRTY RECORDS FOR BUSINESS AUDIT ---")
 
-# 2. Buat tabel jika belum ada (tanpa auto insert)
-con.execute("""
-    CREATE TABLE IF NOT EXISTS laporan_kotor_master (
+db_conn.execute("""
+    CREATE TABLE IF NOT EXISTS dirty_records_master (
         InvoiceNo VARCHAR,
         StockCode VARCHAR,
         Quantity INTEGER,
         UnitPrice DOUBLE,
         CustomerID VARCHAR,
-        nama_file_asal VARCHAR
+        source_file_name VARCHAR
     )
 """)
 
-# 3. Masukkan (Append) data kotor baru ke tabel master
-con.execute(f"INSERT INTO laporan_kotor_master {query_kotor}")
+db_conn.execute(f"INSERT INTO dirty_records_master {dirty_data_query}")
 
-# 3. Simpan seluruh tabel master ke CSV
-if nama_file == 'DEBUG':
-    print("\n[DEBUG MODE] Tes audit sukses! Data TIDAK diekspor ke CSV agar file laporan tidak kotor.")
+# =====================================================================
+# 4. EKSPOR LAPORAN ANOMALI KE FILE CSV
+# Ekspor ke file CSV lokal jika bukan mode DEBUG
+# =====================================================================
+if target_file_name == 'DEBUG':
+    print("\n[DEBUG MODE] Audit test successful! Data NOT exported to CSV to keep environment clean.")
 else:
-    con.execute("COPY laporan_kotor_master TO 'laporan_kotor_uk.csv' (HEADER, DELIMITER ',')")
-    print("\nSelesai! Laporan kotor berhasil dibuat.")
+    db_conn.execute("COPY dirty_records_master TO 'dirty_records_report.csv' (HEADER, DELIMITER ',')")
+    print("\n[SUCCESS] Audit completed. Anomaly report generated at 'dirty_records_report.csv'.")

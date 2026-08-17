@@ -1,28 +1,28 @@
 import duckdb
 
-print("=== MENYUSUN LAPORAN EKSEKUTIF (BI LAYER) ===")
+print("=== GENERATING EXECUTIVE REPORT (BI LAYER) ===")
 
-# Hubungkan langsung ke Database Permanen Utama (Bukan database sementara)
-con = duckdb.connect('data_mart/database_utama.duckdb')
+# Hubungkan langsung ke Database Main Warehouse (DuckDB Permanen)
+con = duckdb.connect('data_mart/main_warehouse.duckdb')
 
 # Query analitik untuk merangkum performa bisnis dari tabel sales_dashboard
-query_laporan = """
+executive_report_query = """
     SELECT 
-        COUNT(InvoiceNo) AS total_transaksi_bersih,
-        ROUND(SUM(Total_Harga), 2) AS total_pendapatan_gbp,
-        ROUND(AVG(Total_Harga), 2) AS rata_rata_nilai_transaksi,
-        COUNT(DISTINCT CustomerID) AS total_pelanggan_unik
+        COUNT(InvoiceNo) AS total_clean_transactions,
+        ROUND(SUM(Total_Price), 2) AS total_revenue_gbp,
+        ROUND(AVG(Total_Price), 2) AS average_order_value,
+        COUNT(DISTINCT CustomerID) AS total_unique_customers
     FROM sales_dashboard
 """
 
-# Eksekusi dan ubah jadi DataFrame
-hasil_laporan = con.execute(query_laporan).df()
+# Eksekusi dan ubah hasil query ke DataFrame
+report_results = con.execute(executive_report_query).df()
 
-print("\n" + "="*50)
-print("         LAPORAN KESEHATAN & PERFORMA BISNIS RITEL")
-print("="*50)
-print(hasil_laporan.to_string(index=False))
-print("="*50)
-print("[SUCCESS] Laporan eksekutif berhasil digenerate secara otomatis dari DuckDB.")
+print("\n" + "="*60)
+print("       EXECUTIVE RETAIL BUSINESS PERFORMANCE REPORT")
+print("="*60)
+print(report_results.to_string(index=False))
+print("="*60)
+print("[SUCCESS] Executive report generated successfully from DuckDB Warehouse.")
 
 con.close()

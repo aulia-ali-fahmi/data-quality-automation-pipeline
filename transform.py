@@ -1,58 +1,73 @@
 import duckdb
 import sys
 
-# Tangkap nama file dari pipeline
-nama_file = sys.argv[1] if len(sys.argv) > 1 else 'DEBUG'
+# =====================================================================
+# 1. TANGKAP ARGUMEN DINAMIS DARI PIPELINE
+# Tangkap nama file target dari argument pipeline.py
+# =====================================================================
+target_file_name = sys.argv[1] if len(sys.argv) > 1 else 'DEBUG'
 
-print("Memulai proses Transformasi Data (ETL)...")
-con = duckdb.connect('latihan_QA.db')
+print("=== STARTING DATA TRANSFORMATIONAL ETL PROCESS ===")
 
-# 1. Menyiapkan query bersih + MENAMBAHKAN PENANDA NAMA FILE ASAL
-query_bersih = f"""
+# Hubungkan ke database staging sementara
+db_conn = duckdb.connect('temp_staging.db')
+
+# =====================================================================
+# 2. FILTER & TRANSFORMASI DATA BERSIH
+# Menyeleksi data valid serta menghitung kalkulasi bisnis (Total_Price)
+# Read dari tabel 'raw_sales' hasil keluaran standardizer.py
+# =====================================================================
+clean_data_query = f"""
 	SELECT
 		InvoiceNo,
 		StockCode,
 		Quantity,
 		UnitPrice,
 		CustomerID,
-		(Quantity * UnitPrice) AS Total_Harga,
-		'{nama_file}' AS nama_file_asal
-	FROM ritel
+		(Quantity * UnitPrice) AS Total_Price,
+		'{target_file_name}' AS source_file_name
+	FROM raw_sales
 	WHERE CustomerID IS NOT NULL
 		AND UnitPrice > 0
 		AND Quantity > 0
 """
 
-# 2. Buat struktur tabel master bersih tanpa isi (WHERE 1=0) jika belum ada
-con.execute("""
-    CREATE TABLE IF NOT EXISTS ritel_bersih_master (
+# =====================================================================
+# 3. PENYIMPANAN KE MASTER CLEAN TABLE
+# Menggabungkan/append data bersih baru ke tabel master penampungan
+# =====================================================================
+db_conn.execute("""
+    CREATE TABLE IF NOT EXISTS clean_sales_master (
         InvoiceNo VARCHAR,
         StockCode VARCHAR,
         Quantity INTEGER,
         UnitPrice DOUBLE,
         CustomerID VARCHAR,
-        Total_Harga DOUBLE,
-        nama_file_asal VARCHAR
+        Total_Price DOUBLE,
+        source_file_name VARCHAR
     )
 """)
 
-# 3. Masukkan (Append) data bersih baru ke tabel master
-con.execute(f"INSERT INTO ritel_bersih_master {query_bersih}")
+db_conn.execute(f"INSERT INTO clean_sales_master {clean_data_query}")
 
-print("\n--- TOTAL DATA BERSIH SIAP PAKAI ---")
-print(con.execute("SELECT COUNT(*) AS jumlah_bersih FROM ritel_bersih_master").df())
+print("\n--- TOTAL CLEAN RECORDS READY FOR ANALYSIS ---")
+print(db_conn.execute("SELECT COUNT(*) AS clean_records_count FROM clean_sales_master").df())
 
-print("\n--- 5 BARIS TERATAS DATA BERSIH ---")
-print(con.execute("SELECT * FROM ritel_bersih_master LIMIT 5").df())
+print("\n--- TOP 5 ROWS OF CLEAN DATA ---")
+print(db_conn.execute("SELECT * FROM clean_sales_master LIMIT 5").df())
 
-print("\n--- TOTAL PENJUALAN BERSIH (DALAM GBP) ---")
-print(con.execute("SELECT SUM(Total_Harga) AS total_penjualan_bersih_gbp FROM ritel_bersih_master").df())
+print("\n--- TOTAL NET SALES (IN GBP) ---")
+print(db_conn.execute("SELECT SUM(Total_Price) AS total_net_sales_gbp FROM clean_sales_master").df())
 
-print("\n--- MENYIMPAN DATA BERSIH KE FORMAT PARQUET ---")
+# =====================================================================
+# 4. EKSPOR DATA BERSIH KE FORMAT PARQUET
+# Ekspor ke file Parquet di folder data_mart jika bukan mode DEBUG
+# =====================================================================
+print("\n--- EXPORTING CLEAN DATA TO PARQUET FORMAT ---")
 
-# 4. Ekspor tabel master menjadi file Parquet yang super ringan dan cepat
-if nama_file == 'DEBUG':
-    print("\n[DEBUG MODE] Tes transformasi sukses! Data TIDAK diekspor ke Parquet agar data_mart tidak kotor.")
+if target_file_name == 'DEBUG':
+    print("\n[DEBUG MODE] Transformation test successful! Data NOT exported to Parquet to keep data_mart clean.")
 else:
-    con.execute("COPY ritel_bersih_master TO 'data_mart/data_siap_analisis.parquet' (FORMAT PARQUET)")
-    print("\n[SUCCESS] Selesai! Data siap dipakai oleh mesin AI dan Dasbor.")
+    # DISESUAIKAN: Nama file Parquet diubah ke Bahasa Inggris standar
+    db_conn.execute("COPY clean_sales_master TO 'data_mart/analytics_ready_data.parquet' (FORMAT PARQUET)")
+    print("\n[SUCCESS] Transformation completed. Clean dataset exported to 'data_mart/analytics_ready_data.parquet'.")
