@@ -2,6 +2,9 @@
 
 An end-to-end, idempotent Data Engineering pipeline built with Python and DuckDB. This project automates raw data ingestion, column standardization, anomaly auditing, business transformation, and automated QA testing.
 
+## Business Value
+This automated pipeline eliminates manual data QA bottlenecks, catches schema anomalies before downstream failures, and ensures high data freshness using Python, DuckDB, and GitHub Actions.
+
 ## System Architecture & Data Flow
 
 ```text
@@ -60,3 +63,4 @@ An end-to-end, idempotent Data Engineering pipeline built with Python and DuckDB
 4. Execute the pipeline to process the prepared sample dataset (`input/data.csv`):
    ```bash
    python pipeline.py
+
